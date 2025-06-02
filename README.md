@@ -1,5 +1,5 @@
 # Bangle.jsSmiley
-#TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
+# TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
 
 
 A social, interactive virtual pet that runs on Bangle.js smartwatches, controlled via Web Bluetooth. Designed for the Ubiquitous Systems Lab (Summer Semester 2025).
