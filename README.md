@@ -1,10 +1,10 @@
 # Bangle.jsSmiley
-# 🐷 TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
+ TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
 
 
 A social, interactive virtual pet that runs on Bangle.js smartwatches, controlled via Web Bluetooth. Designed for the Ubiquitous Systems Lab (Summer Semester 2025).
 
-## ✨ Features
+##  Features
 
 - **Life Simulation**:
   - Hunger, fun, and energy stats that degrade over time
@@ -27,7 +27,7 @@ A social, interactive virtual pet that runs on Bangle.js smartwatches, controlle
   - Score tracking
   - State persistence between sessions
 
-## 📦 Hardware Requirements
+##  Hardware Requirements
 
 - 1-2 [Bangle.js v1/v2 smartwatches](https://banglejs.com/)
 - Computer with Bluetooth 4.0+ for WebBLE control
