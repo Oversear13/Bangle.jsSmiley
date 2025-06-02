@@ -1,20 +1,20 @@
 # Bangle.jsSmiley
- TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
+#TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
 
 
 A social, interactive virtual pet that runs on Bangle.js smartwatches, controlled via Web Bluetooth. Designed for the Ubiquitous Systems Lab (Summer Semester 2025).
 
-##  Features
+## Notable Features
 
 - **Life Simulation**:
-  - Hunger, fun, and energy stats that degrade over time
-  - Different emotional states (happy, hungry, tired)
+  - Hunger, loneliness, cleanliness and energy stats that degrade over time.
+  - Different emotional states and corresponding actions to 'fix' them.  (happy, hungry, tired)
   - Death/revival mechanics
 
 - **Rich Animations**:
   - Smooth wobble effect
-  - Blinking eyes, snoting nose
-  - State-specific facial expressions
+  - Blinking eyes
+  - Facial expressions based on current emotional state.
   - Visual feedback for interactions
 
 - **Multiple Control Methods**:
@@ -27,7 +27,7 @@ A social, interactive virtual pet that runs on Bangle.js smartwatches, controlle
   - Score tracking
   - State persistence between sessions
 
-##  Hardware Requirements
+## Hardware Requirements
 
 - 1-2 [Bangle.js v1/v2 smartwatches](https://banglejs.com/)
 - Computer with Bluetooth 4.0+ for WebBLE control
@@ -35,8 +35,8 @@ A social, interactive virtual pet that runs on Bangle.js smartwatches, controlle
 
 
 # Using Espruino Web IDE:
-# 1. Go to https://www.espruino.com/ide/
-# 2. Connect your Bangle.js
-# 3. Paste the code from twingotchi.js
-# 4. Click "Send to Espruino"
-# 5. Type 'save()' to make it persist
+1. Go to https://www.espruino.com/ide/
+2. Connect your Bangle.js
+3. Paste the code from twingotchi.js
+4. Click "Send to Espruino"
+5. Type 'save()' to make it persist
