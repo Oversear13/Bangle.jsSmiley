@@ -1,4 +1,4 @@
-# Bangle.jsSmiley
+
 # TwinGotchi - A Tamagotchi-Style Virtual Pet for Bangle.js
 
 
