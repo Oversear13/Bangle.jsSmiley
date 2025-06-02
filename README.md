@@ -13,7 +13,7 @@ A social, interactive virtual pet that runs on Bangle.js smartwatches, controlle
 
 - **Rich Animations**:
   - Smooth wobble effect
-  - Blinking eyes
+  - Blinking eyes, snoting nose
   - State-specific facial expressions
   - Visual feedback for interactions
 
