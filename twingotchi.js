@@ -1,7 +1,7 @@
 // === Constants and State ===
 const centerX = g.getWidth() / 2;
 const centerY = g.getHeight() / 2;
-const faceRadius = 105;
+const faceRadius = 70;
 let wobble = 0;
 let wobbleDir = 1;
 let blinkNow = false;
@@ -137,12 +137,12 @@ function drawPig() {
 }
 
 function drawFace() {
-    let color = !state.isAlive ? [0.5, 0.5, 0.5] :
-        state.hunger < 20 ? [1, 0.9, 0.7] :
-            state.fun > 70 ? [1, 0.8, 0.9] :
-                [1, 0.75, 0.8];
-    g.setColor(color[0], color[1], color[2]);
     let offsetX = Math.sin(wobble) * 3;
+    let values = Object.values(needs);
+    let minNeed = values.reduce((a, b) => a < b ? a : b);
+    let faceHue = 0.9 - (0.6 * (1 - minNeed / 100));
+
+    g.setColor(state.isAlive ? faceHue : 0.5, 0.75, state.isAlive ? 1 : 0.5);
     g.fillCircle(centerX + offsetX, centerY, faceRadius);
 }
 
@@ -150,14 +150,26 @@ function drawEars() {
     let offsetX = Math.sin(wobble) * 3;
     g.setColor(1, 0.6, 0.7);
     g.fillPoly([
-        centerX - 35 + offsetX, centerY - 45,
-        centerX - 48 + offsetX, centerY - 70,
-        centerX - 20 + offsetX, centerY - 65
+        centerX - 30 + offsetX, centerY - 50,
+        centerX - 50 + offsetX, centerY - 80,
+        centerX - 20 + offsetX, centerY - 70
     ]);
     g.fillPoly([
-        centerX + 35 + offsetX, centerY - 45,
-        centerX + 48 + offsetX, centerY - 70,
-        centerX + 20 + offsetX, centerY - 65
+        centerX + 30 + offsetX, centerY - 50,
+        centerX + 50 + offsetX, centerY - 80,
+        centerX + 20 + offsetX, centerY - 70
+    ]);
+
+    g.setColor(1, 0.8, 0.85);
+    g.fillPoly([
+        centerX - 25 + offsetX, centerY - 55,
+        centerX - 40 + offsetX, centerY - 75,
+        centerX - 25 + offsetX, centerY - 65
+    ]);
+    g.fillPoly([
+        centerX + 25 + offsetX, centerY - 55,
+        centerX + 40 + offsetX, centerY - 75,
+        centerX + 25 + offsetX, centerY - 65
     ]);
 }
 
@@ -165,34 +177,42 @@ function drawEyes() {
     let offsetX = Math.sin(wobble) * 3;
     g.setColor(0, 0, 0);
     if (blinkNow) {
-        g.drawLine(centerX - 20 + offsetX, centerY - 15, centerX - 8 + offsetX, centerY - 15);
-        g.drawLine(centerX + 8 + offsetX, centerY - 15, centerX + 20 + offsetX, centerY - 15);
-        return;
+        g.drawLine(centerX - 20 + offsetX, centerY - 15, centerX - 10 + offsetX, centerY - 15);
+        g.drawLine(centerX + 10 + offsetX, centerY - 15, centerX + 20 + offsetX, centerY - 15);
+    } else {
+        g.fillCircle(centerX - 15 + offsetX, centerY - 15, 5);
+        g.fillCircle(centerX + 15 + offsetX, centerY - 15, 5);
+        g.setColor(1, 1, 1);
+        g.fillCircle(centerX - 17 + offsetX, centerY - 17, 2);
+        g.fillCircle(centerX + 13 + offsetX, centerY - 17, 2);
     }
-    g.fillCircle(centerX - 15 + offsetX, centerY - 15, 4);
-    g.fillCircle(centerX + 15 + offsetX, centerY - 15, 4);
 }
 
 function drawSnout() {
     let offsetX = Math.sin(wobble) * 3;
     g.setColor(1, 0.6, 0.7);
-    g.fillCircle(centerX + offsetX, centerY + 15, 14);
+    g.fillCircle(centerX + offsetX, centerY + 10, 20);
     g.setColor(0, 0, 0);
-    g.fillCircle(centerX - 6 + offsetX, centerY + 15, 2);
-    g.fillCircle(centerX + 6 + offsetX, centerY + 15, 2);
+    g.fillCircle(centerX - 5 + offsetX, centerY + 10, 3);
+    g.fillCircle(centerX + 5 + offsetX, centerY + 10, 3);
+    g.setColor(0.5, 0.5, 0.5);
+    g.fillCircle(centerX - 5 + offsetX, centerY + 8, 1);
+    g.fillCircle(centerX + 5 + offsetX, centerY + 8, 1);
 }
 
 function drawMouth() {
     let offsetX = Math.sin(wobble) * 3;
+    g.setColor(0, 0, 0);
     if (!state.isAlive) {
         g.drawLine(centerX - 12 + offsetX, centerY + 30, centerX + 12 + offsetX, centerY + 42);
         g.drawLine(centerX + 12 + offsetX, centerY + 30, centerX - 12 + offsetX, centerY + 42);
     } else {
-        g.drawLine(centerX - 15 + offsetX, centerY + 35, centerX - 5 + offsetX, centerY + 40);
-        g.drawLine(centerX - 5 + offsetX, centerY + 40, centerX + 5 + offsetX, centerY + 40);
-        g.drawLine(centerX + 5 + offsetX, centerY + 40, centerX + 15 + offsetX, centerY + 35);
+        g.drawLine(centerX - 15 + offsetX, centerY + 25, centerX - 5 + offsetX, centerY + 30);
+        g.drawLine(centerX - 5 + offsetX, centerY + 30, centerX + 5 + offsetX, centerY + 30);
+        g.drawLine(centerX + 5 + offsetX, centerY + 30, centerX + 15 + offsetX, centerY + 25);
     }
 }
+
 
 
 function startInput() {
