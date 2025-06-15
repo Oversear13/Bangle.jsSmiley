@@ -131,7 +131,6 @@ function drawPig() {
         drawEyes();
         drawSnout();
         drawMouth();
-        drawButtons();
         drawNeedBars();
     }
     g.flip();
@@ -195,13 +194,6 @@ function drawMouth() {
     }
 }
 
-function drawButtons() {
-    g.setFont("6x8");
-    g.setFontAlign(0, -1);
-    g.drawString("BTN1: ^", centerX, g.getHeight() - 24);
-    g.drawString("BTN2: OK", centerX, g.getHeight() - 16);
-    g.drawString("BTN3: v", centerX, g.getHeight() - 8);
-}
 
 function startInput() {
     setWatch(() => {
