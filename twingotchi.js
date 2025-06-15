@@ -1,6 +1,6 @@
 // === Constants and State ===
 const centerX = g.getWidth() / 2;
-const centerY = g.getHeight() / 2;
+const centerY = g.getHeight() / 2 +30;
 const faceRadius = 70;
 let wobble = 0;
 let wobbleDir = 1;
