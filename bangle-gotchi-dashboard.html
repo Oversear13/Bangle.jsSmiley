@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bangle-Gotchi Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <style>
+    .status-bar {
+      background-color: #eee;
+      height: 25px;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .status-fill {
+      height: 100%;
+      border-radius: 12px;
+      transition: width 0.5s ease;
+    }
+    .status-label {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      line-height: 25px;
+      font-weight: bold;
+      color: #333;
+    }
+    .status-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 max-w-3xl mx-auto p-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">Bangle-Gotchi Dashboard</h1>
+    <div id="connectionStatus" class="px-4 py-2 rounded-full text-white text-sm bg-red-500">Disconnected</div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-6">
+    <div class="text-center text-6xl mb-4" id="petFace"></div>
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="status-container">
+        <label class="text-sm font-semibold">Hunger</label>
+        <div class="status-bar">
+          <div id="hungerBar" class="status-fill bg-red-500" style="width: 0%"></div>
+          <div class="status-label"><span id="hungerValue">0</span>%</div>
+        </div>
+      </div>
+      <div class="status-container">
+        <label class="text-sm font-semibold">Love</label>
+        <div class="status-bar">
+          <div id="loveBar" class="status-fill bg-yellow-500" style="width: 100%"></div>
+          <div class="status-label"><span id="loveValue">100</span>%</div>
+        </div>
+      </div>
+      <div class="status-container">
+        <label class="text-sm font-semibold">Clean</label>
+        <div class="status-bar">
+          <div id="cleanBar" class="status-fill bg-blue-500" style="width: 100%"></div>
+          <div class="status-label"><span id="cleanValue">100</span>%</div>
+        </div>
+      </div>
+      <div class="status-container">
+        <label class="text-sm font-semibold">Energy</label>
+        <div class="status-bar">
+          <div id="energyBar" class="status-fill bg-purple-500" style="width: 100%"></div>
+          <div class="status-label"><span id="energyValue">100</span>%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <button onclick="sendCommand('feed')" class="bg-green-600 text-white font-bold py-2 px-4 rounded">Feed</button>
+      <button onclick="sendCommand('pet')" class="bg-pink-500 text-white font-bold py-2 px-4 rounded">Pet</button>
+      <button onclick="sendCommand('clean')" class="bg-yellow-400 text-black font-bold py-2 px-4 rounded">Clean</button>
+      <button onclick="sendCommand('sleep')" class="bg-indigo-500 text-white font-bold py-2 px-4 rounded">Sleep</button>
+    </div>
+
+    <div class="bg-yellow-100 text-yellow-800 p-4 rounded" id="careTips" style="display: none;">Your pet is happy and healthy!</div>
+  </div>
+
+  <div class="mt-6 space-x-2">
+    <button onclick="connectToBangle()" class="bg-blue-700 text-white py-2 px-4 rounded">Connect to Bangle.js</button>
+    <button onclick="disconnectFromBangle()" class="bg-red-600 text-white py-2 px-4 rounded">Disconnect</button>
+  </div>
+
+  <script>
+    let device = null;
+    let characteristic = null;
+    let buffer = "";
+    let intervalRef = null;
+    let hasStatus = false;
+
+    function connectToBangle() {
+      navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
+      }).then(d => {
+        device = d;
+        return device.gatt.connect();
+      }).then(server => {
+        return server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+      }).then(service => {
+        return Promise.all([
+          service.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e"),
+          service.getCharacteristic("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+        ]);
+      }).then(([tx, rx]) => {
+        characteristic = tx;
+        document.getElementById("connectionStatus").textContent = "Connected";
+        document.getElementById("connectionStatus").classList.remove("bg-red-500");
+        document.getElementById("connectionStatus").classList.add("bg-green-500");
+
+        rx.startNotifications().then(_ => {
+          rx.addEventListener("characteristicvaluechanged", event => {
+            const value = new TextDecoder().decode(event.target.value);
+            buffer += value;
+            if (buffer.includes("\n")) {
+              const lines = buffer.split("\n");
+              for (let i = 0; i < lines.length - 1; i++) {
+                try {
+                  const json = JSON.parse(lines[i].replace("STATUS ", ""));
+                  updateStatus(json);
+                } catch (e) {
+                  console.error("JSON parse failed:", lines[i]);
+                }
+              }
+              buffer = lines[lines.length - 1];
+            }
+          });
+        });
+
+        intervalRef = setInterval(() => sendCommand("status"), 10000);
+        sendCommand("status");
+      }).catch(error => {
+        console.error("BLE Connection Error:", error);
+        alert("Connection failed: " + error);
+      });
+    }
+
+    function disconnectFromBangle() {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+        document.getElementById("connectionStatus").textContent = "Disconnected";
+        document.getElementById("connectionStatus").classList.remove("bg-green-500");
+        document.getElementById("connectionStatus").classList.add("bg-red-500");
+        if (intervalRef) clearInterval(intervalRef);
+        characteristic = null;
+        device = null;
+      }
+    }
+
+    function sendCommand(cmd) {
+      if (!characteristic) return alert("Not connected");
+      const encoder = new TextEncoder();
+      characteristic.writeValue(encoder.encode(cmd + "\n"));
+    }
+
+    function updateStatus(needs) {
+      hasStatus = true;
+      document.getElementById("careTips").style.display = "block";
+
+      updateBar("hungerBar", "hungerValue", needs.hunger);
+      updateBar("loveBar", "loveValue", needs.loneliness);
+      updateBar("cleanBar", "cleanValue", needs.cleanliness);
+      updateBar("energyBar", "energyValue", needs.energy);
+
+      const petFace = document.getElementById("petFace");
+      const tipText = document.getElementById("careTips");
+
+      let mood = "🐷";
+      let tip = "Your pet is happy and healthy!";
+
+      const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
+      if (minNeed < 30) {
+        mood = "😟";
+        if (needs.hunger < 30) tip = "Your pet is hungry!";
+        else if (needs.loneliness < 30) tip = "Your pet feels lonely.";
+        else if (needs.cleanliness < 30) tip = "Your pet needs cleaning.";
+        else if (needs.energy < 30) tip = "Your pet is tired.";
+      }
+      if (needs.hunger >= 100) {
+        mood = "💀";
+        tip = "EMERGENCY! Your pet is starving!";
+      }
+
+      petFace.textContent = mood;
+      tipText.textContent = tip;
+    }
+
+    function updateBar(barId, valId, value) {
+      document.getElementById(barId).style.width = `${value}%`;
+      document.getElementById(valId).textContent = Math.round(value);
+    }
+  </script>
+</body>
+</html>
