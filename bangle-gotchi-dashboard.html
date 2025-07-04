@@ -292,7 +292,7 @@
       else if (needs.energy < 30) tip = "😴 Your pet is tired! Click Sleep.";
     }
 
-    if (needs.hunger >= 100) {
+    if (needs.hunger <= 10) {
       mood = "💀";
       tip = "🚨 EMERGENCY! Your pet is starving!";
     }
