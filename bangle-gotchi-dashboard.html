@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,11 +14,13 @@
       overflow: hidden;
       position: relative;
     }
+
     .status-fill {
       height: 100%;
       border-radius: 12px;
       transition: width 0.5s ease;
     }
+
     .status-label {
       position: absolute;
       width: 100%;
@@ -26,11 +29,13 @@
       font-weight: bold;
       color: #333;
     }
+
     .status-container {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
     }
+
     .debug-log {
       background: #1a1a1a;
       color: #00ff00;
@@ -43,6 +48,7 @@
     }
   </style>
 </head>
+
 <body class="bg-gray-100 max-w-3xl mx-auto p-6">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold">Bangle-Gotchi Dashboard</h1>
@@ -51,7 +57,7 @@
 
   <div class="bg-white rounded-lg shadow p-6">
     <div class="text-center text-6xl mb-4" id="petFace">🐷</div>
-
+    
     <div class="grid grid-cols-2 gap-4 mb-6">
       <div class="status-container">
         <label class="text-sm font-semibold">Hunger</label>
@@ -83,15 +89,15 @@
       </div>
     </div>
 
-    
-
-    <div class="bg-yellow-100 text-yellow-800 p-4 rounded" id="careTips" style="display: none;">Your pet is happy and healthy!</div>
+    <div class="bg-yellow-100 text-yellow-800 p-4 rounded" id="careTips" style="display: none;">Your pet is happy and
+      healthy!</div>
   </div>
 
   <div class="mt-6 space-x-2">
-    <button onclick="connectToBangle()" class="bg-blue-700 text-white py-2 px-4 rounded hover:bg-blue-800 transition-colors">Connect to Bangle.js</button>
-    <button onclick="disconnectFromBangle()" class="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors">Disconnect</button>
-
+    <button onclick="connectToBangle()"
+      class="bg-blue-700 text-white py-2 px-4 rounded hover:bg-blue-800 transition-colors">Connect to Bangle.js</button>
+    <button onclick="disconnectFromBangle()"
+      class="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors">Disconnect</button>
   </div>
 
   <div id="debugPanel" class="mt-6 bg-white rounded-lg shadow p-4" style="display: none;">
@@ -100,218 +106,279 @@
     <button onclick="clearDebug()" class="mt-2 bg-gray-500 text-white px-3 py-1 rounded text-sm">Clear Log</button>
   </div>
 
-  
-<script>
-  let device = null;
-  let characteristic = null;
-  let buffer = "";
-  let intervalRef = null;
-  let hasStatus = false;
-  //let debugVisible = false;
+  <script>
+    let device = null;
+    let characteristic = null;
+    let buffer = "";
+    let intervalRef = null;
+    let hasStatus = false;
+    let pigAlive = true;
+    let isEmergency = false;
+    let isRestless = false;
 
-  function log(message) {
-    console.log(message);
-    const debugLog = document.getElementById('debugLog');
-    const timestamp = new Date().toLocaleTimeString();
-    debugLog.innerHTML += `[${timestamp}] ${message}\n`;
-    debugLog.scrollTop = debugLog.scrollHeight;
-  }
+    function log(message) {
+      console.log(message);
+      const debugLog = document.getElementById('debugLog');
+      const timestamp = new Date().toLocaleTimeString();
+      debugLog.innerHTML += `[${timestamp}] ${message}\n`;
+      debugLog.scrollTop = debugLog.scrollHeight;
+    }
 
+    function clearDebug() {
+      document.getElementById('debugLog').innerHTML = '';
+    }
 
+    function connectToBangle() {
+      log("Attempting to connect to Bangle.js...");
 
-  function clearDebug() {
-    document.getElementById('debugLog').innerHTML = '';
-  }
+      navigator.bluetooth.requestDevice({
+        filters: [{
+          name: /.+/
+        }, {
+          namePrefix: 'Bangle.js'
+        }],
+        optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
+      }).then(d => {
+        device = d;
+        log(`Device selected: ${device.name || 'Unknown'}`);
 
-  function connectToBangle() {
-    log("Attempting to connect to Bangle.js...");
-
-    navigator.bluetooth.requestDevice({
-      // NEUE FILTER-KONFIGURATION START
-      filters: [{
-        // Nur Geräte anzeigen, die einen Namen haben
-        name: /.+/ // Matches any device with at least one character in its name
-      }, {
-        // Optional: Filter nach dem Bangle.js Namen, wenn bekannt
-        // Wenn Sie z.B. nur 'Bangle.js' Geräte sehen möchten:
-        namePrefix: 'Bangle.js' 
-      }],
-      // Wenn Sie den spezifischen UART-Service haben, können Sie diesen auch als Filter verwenden.
-      // Dies würde die Liste noch stärker einschränken und ist sehr empfehlenswert.
-      optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
-    }).then(d => {
-      device = d;
-      log(`Device selected: ${device.name || 'Unknown'}`);
-
-      // Add disconnect event listener
-      device.addEventListener('gattserverdisconnected', () => {
-        log("Device disconnected");
-        handleDisconnect();
-      });
-
-      return device.gatt.connect();
-    }).then(server => {
-      log("GATT server connected");
-      return server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
-    }).then(service => {
-      log("UART service found");
-      return Promise.all([
-        service.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e"),
-        service.getCharacteristic("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
-      ]);
-    }).then(([tx, rx]) => {
-      characteristic = tx;
-      log("Characteristics obtained");
-
-      document.getElementById("connectionStatus").textContent = "Connected";
-      document.getElementById("connectionStatus").classList.replace("bg-red-500", "bg-green-500");
-
-      return rx.startNotifications().then(() => {
-        log("Notifications started");
-
-        rx.addEventListener("characteristicvaluechanged", event => {
-          const value = new TextDecoder().decode(event.target.value);
-          log(`Received: ${value.trim()}`);
-          buffer += value;
-
-          if (buffer.includes("\n")) {
-            const lines = buffer.split("\n");
-            for (let i = 0; i < lines.length - 1; i++) {
-              const line = lines[i].trim();
-              if (line.startsWith("STATUS ")) {
-                try {
-                  const json = JSON.parse(line.slice(7));
-                  log(`Status updated: ${JSON.stringify(json)}`);
-                  updateStatus(json);
-                } catch (e) {
-                  log(`JSON parse error: ${e.message}`);
-                }
-              } else if (line.length > 0) {
-                log(`Other message: ${line}`);
-              }
-            }
-            buffer = lines[lines.length - 1];
-          }
+        device.addEventListener('gattserverdisconnected', () => {
+          log("Device disconnected");
+          handleDisconnect();
         });
-      });
-    }).then(() => {
-      intervalRef = setInterval(() => {
-        log("Requesting status...");
-        sendCommand("status");
-      }, 10000);
 
-      setTimeout(() => sendCommand("status"), 1000);
-      log("Connection established successfully!");
-    }).catch(error => {
-      log(`Connection error: ${error.message}`);
-      // Verbesserte Fehlermeldung für den Benutzer
-      if (error.name === 'NotFoundError') {
-        alert("Connection failed: No matching Bluetooth device found or selected. Make sure your Bangle.js is advertising.");
-      } else if (error.name === 'NetworkError') {
-        alert("Connection failed: Bluetooth is likely turned off or unavailable on your device.");
-      } else {
-        alert("Connection failed: " + error.message);
-      }
-    });
-  }
+        return device.gatt.connect();
+      }).then(server => {
+        log("GATT server connected");
+        return server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+      }).then(service => {
+        log("UART service found");
+        return Promise.all([
+          service.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e"),
+          service.getCharacteristic("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+        ]);
+      }).then(([tx, rx]) => {
+        characteristic = tx;
+        log("Characteristics obtained");
 
-  function disconnectFromBangle() {
-    if (device && device.gatt && device.gatt.connected) {
-      log("Disconnecting from Bangle.js...");
-      device.gatt.disconnect();
-    } else {
-      handleDisconnect();
-    }
-  }
+        document.getElementById("connectionStatus").textContent = "Connected";
+        document.getElementById("connectionStatus").classList.replace("bg-red-500", "bg-green-500");
 
-  function handleDisconnect() {
-    if (intervalRef) {
-      clearInterval(intervalRef);
-      intervalRef = null;
-    }
-    characteristic = null;
-    device = null;
+        return rx.startNotifications().then(() => {
+          log("Notifications started");
 
-    document.getElementById("connectionStatus").textContent = "Disconnected";
-    document.getElementById("connectionStatus").classList.replace("bg-green-500", "bg-red-500");
+          rx.addEventListener("characteristicvaluechanged", event => {
+            const value = new TextDecoder().decode(event.target.value);
+            log(`Received: ${value.trim()}`);
+            buffer += value;
 
-    log("Disconnected from device");
-  }
+            if (buffer.includes("\n")) {
+              const lines = buffer.split("\n");
+              for (let i = 0; i < lines.length - 1; i++) {
+                const line = lines[i].trim();
+                if (line.startsWith("STATUS ")) {
+                  try {
+                    const json = JSON.parse(line.slice(7));
+                    log(`Status updated: ${JSON.stringify(json)}`);
+                    updateStatus(json);
+                  } catch (e) {
+                    log(`JSON parse error: ${e.message}`);
+                  }
+                } else if (line.startsWith("SHAKE_PLAY")) {
+                  log("Pet is being shaken - loneliness decreased!");
+                  setTimeout(() => updateStatusText(), 3000);
+                } else if (line.startsWith("PIG_RESTLESS")) {
+                  log("Pet is restless - needs attention!");
+                  isRestless = true;
+                  updateStatusText();
+                } else if (line.startsWith("PIG_HAPPY")) {
+                  log("Pet is happy from movement!");
+                  isRestless = false;
+                  updateStatusText();
+                } else if (line.startsWith("EMERGENCY_STARTED")) {
+                  log("EMERGENCY! Pet needs immediate attention!");
+                  isEmergency = true;
+                  updateStatusText();
+                } else if (line.startsWith("PIG_DIED")) {
+                  log("Pet has died! 💀");
+                  pigAlive = false;
+                  handlePetDeath();
+                } else if (line.startsWith("PIG_REVIVED")) {
+                  log("Pet has been revived! 🎉");
+                  pigAlive = true;
+                  isEmergency = false;
+                  isRestless = false;
+                  updateStatusText();
+                } else if (line.length > 0) {
+                  log(`Other message: ${line}`);
+                }
+              }
+              buffer = lines[lines.length - 1];
+            }
+          });
+        });
+      }).then(() => {
+        intervalRef = setInterval(() => {
+          log("Requesting status...");
+          sendCommand("status");
+        }, 10000);
 
-  function sendCommand(cmd) {
-    if (!characteristic) {
-      log("Cannot send command: Not connected");
-      alert("Not connected to Bangle.js");
-      return;
-    }
-
-    try {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(cmd + "\n");
-
-      log(`Sending command: "${cmd}"`);
-      characteristic.writeValue(data).then(() => {
-        log(`Command sent successfully: "${cmd}"`);
-        if (cmd !== "status") {
-          setTimeout(() => {
-            log("Auto-requesting status...");
-            sendCommand("status");
-          }, 500);
-        }
+        log("Connection established successfully!");
       }).catch(error => {
-        log(`Command send failed: ${error.message}`);
-        alert("Failed to send command");
+        log(`Connection error: ${error.message}`);
+        if (error.name === 'NotFoundError') {
+          alert("Connection failed: No matching Bluetooth device found or selected. Make sure your Bangle.js is advertising.");
+        } else if (error.name === 'NetworkError') {
+          alert("Connection failed: Bluetooth is likely turned off or unavailable on your device.");
+        } else {
+          alert("Connection failed: " + error.message);
+        }
       });
-    } catch (error) {
-      log(`Encoding error: ${error.message}`);
-      alert("Error sending command");
-    }
-  }
-
-  function updateStatus(needs) {
-    hasStatus = true;
-    document.getElementById("careTips").style.display = "block";
-
-    updateBar("hungerBar", "hungerValue", needs.hunger);
-    updateBar("loveBar", "loveValue", needs.loneliness);
-    updateBar("cleanBar", "cleanValue", needs.cleanliness);
-    updateBar("energyBar", "energyValue", needs.energy);
-
-    const petFace = document.getElementById("petFace");
-    const tipText = document.getElementById("careTips");
-
-    let mood = "🐷";
-    let tip = "Your pet is happy and healthy!";
-    const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
-
-    if (minNeed < 30) {
-      mood = "😟";
-      if (needs.hunger < 30) tip = "🍎 Your pet is hungry! Click Feed.";
-      else if (needs.loneliness < 30) tip = "❤️ Your pet feels lonely! Click Pet.";
-      else if (needs.cleanliness < 30) tip = "🧽 Your pet needs cleaning! Click Clean.";
-      else if (needs.energy < 30) tip = "😴 Your pet is tired! Click Sleep.";
     }
 
-    if (needs.hunger <= 10) {
-      mood = "💀";
-      tip = "🚨 EMERGENCY! Your pet is starving!";
+    function disconnectFromBangle() {
+      if (device && device.gatt && device.gatt.connected) {
+        log("Disconnecting from Bangle.js...");
+        device.gatt.disconnect();
+      } else {
+        handleDisconnect();
+      }
     }
 
-    petFace.textContent = mood;
-    tipText.textContent = tip;
-    tipText.className = minNeed < 30 ?
-      "bg-red-100 text-red-800 p-4 rounded" :
-      "bg-yellow-100 text-yellow-800 p-4 rounded";
-  }
+    function handleDisconnect() {
+      if (intervalRef) {
+        clearInterval(intervalRef);
+        intervalRef = null;
+      }
+      characteristic = null;
+      device = null;
 
-  function updateBar(barId, valId, value) {
-    const clamped = Math.max(0, Math.min(100, value));
-    document.getElementById(barId).style.width = `${clamped}%`;
-    document.getElementById(valId).textContent = Math.round(clamped);
-  }
+      document.getElementById("connectionStatus").textContent = "Disconnected";
+      document.getElementById("connectionStatus").classList.replace("bg-green-500", "bg-red-500");
 
-  log("Dashboard initialized. Click 'Connect to Bangle.js' to start.");
-</script>
+      log("Disconnected from device");
+    }
+
+    function sendCommand(cmd) {
+      if (!characteristic) {
+        log("Cannot send command: Not connected");
+        alert("Not connected to Bangle.js");
+        return;
+      }
+
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(cmd + "\n");
+
+        log(`Sending command: "${cmd}"`);
+        characteristic.writeValue(data).then(() => {
+          log(`Command sent successfully: "${cmd}"`);
+          if (cmd !== "status") {
+            setTimeout(() => {
+              log("Auto-requesting status...");
+              sendCommand("status");
+            }, 500);
+          }
+        }).catch(error => {
+          log(`Command send failed: ${error.message}`);
+          alert("Failed to send command");
+        });
+      } catch (error) {
+        log(`Encoding error: ${error.message}`);
+        alert("Error sending command");
+      }
+    }
+
+    function updateStatus(needs) {
+      hasStatus = true;
+      document.getElementById("careTips").style.display = "block";
+
+      updateBar("hungerBar", "hungerValue", needs.hunger);
+      updateBar("loveBar", "loveValue", needs.loneliness);
+      updateBar("cleanBar", "cleanValue", needs.cleanliness);
+      updateBar("energyBar", "energyValue", needs.energy);
+
+      const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
+      
+      // Check for emergency conditions
+      if (minNeed < 20) {
+        isEmergency = true;
+      } else if (minNeed >= 30) {
+        isEmergency = false;
+      }
+      
+      updatePetFace(needs);
+      updateStatusText();
+      updateCareTips(needs);
+    }
+
+    function updatePetFace(needs) {
+      const petFace = document.getElementById("petFace");
+      const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
+      
+      if (!pigAlive) {
+        petFace.textContent = "💀";
+        return;
+      }
+      
+      if (isEmergency) {
+        petFace.textContent = "😱";
+      } else if (isRestless) {
+        petFace.textContent = "😤";
+      } else if (minNeed < 30) {
+        petFace.textContent = "😟";
+      } else if (minNeed > 80) {
+        petFace.textContent = "😊";
+      } else {
+        petFace.textContent = "🐷";
+      }
+    }
+
+    function updateStatusText() {
+      // Status text removed - no longer displayed
+    }
+
+    function updateCareTips(needs) {
+      const tipText = document.getElementById("careTips");
+      const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
+      
+      let tip = "Your pet is happy and healthy!";
+      
+      if (isEmergency) {
+        tip = "🚨 CRITICAL! Your pet will die soon without care!";
+      } else if (minNeed < 30) {
+        if (needs.hunger < 30) tip = "🍎 Your pet is hungry! Feed it on the watch.";
+        else if (needs.loneliness < 30) tip = "❤️ Your pet feels lonely! Pet it on the watch.";
+        else if (needs.cleanliness < 30) tip = "🧽 Your pet needs cleaning! Clean it on the watch.";
+        else if (needs.energy < 30) tip = "😴 Your pet is tired! Let it sleep on the watch.";
+      }
+
+      tipText.textContent = tip;
+      tipText.className = isEmergency ? 
+        "bg-red-100 text-red-800 p-4 rounded font-bold animate-pulse" :
+        minNeed < 30 ? 
+          "bg-orange-100 text-orange-800 p-4 rounded" :
+          "bg-green-100 text-green-800 p-4 rounded";
+    }
+
+    function handlePetDeath() {
+      pigAlive = false;
+      isEmergency = false;
+      isRestless = false;
+      updatePetFace({});
+      document.getElementById("careTips").textContent = "Your pet has died from neglect!";
+      document.getElementById("careTips").className = "bg-red-100 text-red-800 p-4 rounded font-bold";
+    }
+
+    function updateBar(barId, valId, value) {
+      const clamped = Math.max(0, Math.min(100, value));
+      document.getElementById(barId).style.width = `${clamped}%`;
+      document.getElementById(valId).textContent = Math.round(clamped);
+    }
+
+    log("Dashboard initialized. Click 'Connect to Bangle.js' to start.");
+  </script>
 
 </body>
+
 </html>
