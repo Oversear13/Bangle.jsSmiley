@@ -6,186 +6,148 @@ Bangle.drawWidgets = function() {};
 g.clear();
 
 // === STATE ===
-var mainInterval = null;
-var needs = {
-  hunger: 0,
-  loneliness: 100,
-  cleanliness: 100,
-  energy: 100
-};
-var menuOptions = ["Feed", "Pet", "Clean", "Sleep"];
-var menuVisible = false;
-var selectedOption = 0;
-var wobble = 0;
-var wobbleDir = 1;
-var blinkNow = false;
-var isSad = false;
-var centerX = g.getWidth() / 2;
-var centerY = g.getHeight() / 2;
-var faceRadius = 60;
-var emergency = false;
-var emergencyTimer = null;
-var vibrationInterval = null;
-var pigAlive = true;
+let mainInterval = null;
+let needs = { hunger: 100, loneliness: 100, cleanliness: 100, energy: 100 };
+let menuOptions = ["Feed", "Pet", "Clean", "Sleep"];
+let menuVisible = false;
+let selectedOption = 0;
+let wobble = 0;
+let wobbleDir = 1;
+let blinkNow = false;
+let isSad = false;
+let centerX = g.getWidth() / 2;
+let centerY = g.getHeight() / 2;
+let faceRadius = 60;
+let emergency = false;
+let emergencyTimer = null;
+let vibrationInterval = null;
+let pigAlive = true;
 
-// === NEW ACCELEROMETER STATE ===
-var accelData = { x: 0, y: 0, z: 0 };
-var lastMovementTime = Date.now();
-var shakeThreshold = 1.3; // Sensitivity for shake detection
-var inactivityThreshold = 30000; // 30 seconds of no movement
-var inactivityCheckInterval = null;
-var restlessVibrationInterval = null;
-var isRestless = false;
-var shakeAnimation = 0;
-var shakeAnimationTimer = null;
+// === ACCELEROMETER STATE ===
+let accelData = { x: 0, y: 0, z: 0 };
+let lastMovementTime = Date.now();
+let shakeThreshold = 1.3;
+let inactivityThreshold = 30000;
+let inactivityCheckInterval = null;
+let restlessVibrationInterval = null;
+let isRestless = false;
+let shakeAnimation = 0;
+let shakeAnimationTimer = null;
 
-// === ACCELEROMETER FUNCTIONS ===
+// Starts accelerometer tracking and inactivity checks
 function startAccelerometer() {
-  // Set accelerometer to poll mode with reasonable frequency
-  Bangle.setPollInterval(200); // Poll every 200ms
+  Bangle.setPollInterval(200);
   Bangle.on('accel', handleAccelData);
-  
-  // Start inactivity monitoring
-  inactivityCheckInterval = setInterval(checkInactivity, 5000); // Check every 5 seconds
+  inactivityCheckInterval = setInterval(checkInactivity, 5000);
 }
 
+// Handles incoming accelerometer data
 function handleAccelData(data) {
-  var prevAccel = {x: accelData.x, y: accelData.y, z: accelData.z};
+  let prev = accelData;
   accelData = data;
-  
-  // Calculate movement magnitude
-  var deltaX = Math.abs(data.x - prevAccel.x);
-  var deltaY = Math.abs(data.y - prevAccel.y);
-  var deltaZ = Math.abs(data.z - prevAccel.z);
-  var magnitude = Math.sqrt(deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ);
-  
-  // Update last movement time for any significant movement
-  if (magnitude > 0.3) {
+  let dx = Math.abs(data.x - prev.x);
+  let dy = Math.abs(data.y - prev.y);
+  let dz = Math.abs(data.z - prev.z);
+  let mag = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+  if (mag > 0.3) {
     lastMovementTime = Date.now();
-    
-    // Stop restless behavior if pig was restless
-    if (isRestless) {
-      stopRestlessBehavior();
-    }
+    if (isRestless) stopRestlessBehavior();
   }
-  
-  // Detect shake (stronger movement)
-  if (magnitude > shakeThreshold && pigAlive && !menuVisible) {
-    handleShake();
-  }
+
+  if (mag > shakeThreshold && pigAlive && !menuVisible) handleShake();
 }
 
+// Handles a shake event to improve mood
 function handleShake() {
-  // Boost loneliness (playing with pig)
   needs.loneliness = Math.min(100, needs.loneliness + 15);
-  
-  // Add some energy too (pig enjoys playing)
   needs.energy = Math.min(100, needs.energy + 5);
-  
-  // Trigger shake animation
   triggerShakeAnimation();
-  
-  // Happy buzz
   Bangle.buzz(150);
-  
-  // Send status update
   Bluetooth.println("SHAKE_PLAY " + JSON.stringify(needs));
 }
 
+// Triggers shake animation
 function triggerShakeAnimation() {
-  shakeAnimation = 10; // Frames of extra bouncy animation
+  shakeAnimation = 10;
   if (shakeAnimationTimer) clearTimeout(shakeAnimationTimer);
-  shakeAnimationTimer = setTimeout(() => {
-    shakeAnimation = 0;
-  }, 2000);
+  shakeAnimationTimer = setTimeout(() => shakeAnimation = 0, 2000);
 }
 
+// Checks if pig is inactive for too long
 function checkInactivity() {
   if (!pigAlive || menuVisible) return;
-  
-  var timeSinceMovement = Date.now() - lastMovementTime;
-  
-  if (timeSinceMovement > inactivityThreshold && !isRestless) {
-    startRestlessBehavior();
-  }
+  let timeSince = Date.now() - lastMovementTime;
+  if (timeSince > inactivityThreshold && !isRestless) startRestlessBehavior();
 }
 
+// Starts restlessness behavior
 function startRestlessBehavior() {
   if (isRestless || !pigAlive) return;
-  
   isRestless = true;
-  isSad = true; // Make pig look sad
-  
-  // Start gentle vibration pattern
+  isSad = true;
   restlessVibrationInterval = setInterval(() => {
     if (pigAlive && isRestless) {
-      Bangle.buzz(200); // Short gentle buzz
-      // Increase loneliness faster when restless
+      Bangle.buzz(200);
       needs.loneliness = Math.max(0, needs.loneliness - 2);
     }
-  }, 3000); // Every 3 seconds
-  
+  }, 3000);
   Bluetooth.println("PIG_RESTLESS needs attention!");
 }
 
+// Stops restlessness behavior
 function stopRestlessBehavior() {
   if (!isRestless) return;
-  
   isRestless = false;
   if (restlessVibrationInterval) {
     clearInterval(restlessVibrationInterval);
     restlessVibrationInterval = null;
   }
-  
-  // Pig becomes happy again
   setTimeout(() => {
-    if (!isSadFromNeeds()) {
-      isSad = false;
-    }
+    if (!isSadFromNeeds()) isSad = false;
   }, 1000);
-  
   Bluetooth.println("PIG_HAPPY movement detected!");
 }
 
+// Checks if any need is below 30
 function isSadFromNeeds() {
-  var arr = [needs.hunger, needs.loneliness, needs.cleanliness, needs.energy];
-  return arr.some(n => n < 30);
+  var keys = Object.keys(needs);
+  for (var i = 0; i < keys.length; i++) {
+    if (needs[keys[i]] < 30) return true;
+  }
+  return false;
 }
 
-// === DRAWING FUNCTIONS ===
+// Draws the emergency icon on screen
+function drawEmergencyIcon() {
+  g.setColor(1, 0, 0);
+  g.setFont("6x8", 2);
+  g.drawString("!", centerX - 5, centerY + 80);
+  g.setFont("6x8", 1);
+  g.drawString("EMERGENCY!", centerX - 35, centerY + 100);
+}
+
+// Draws the pig's face with mood
 function drawFace() {
   if (menuVisible) return;
   g.setColor(0, 0, 0);
   g.fillRect(0, 0, g.getWidth(), g.getHeight());
-  
-  // Enhanced wobble with shake animation
-  var baseWobble = Math.sin(wobble) * 3;
-  var shakeWobble = shakeAnimation > 0 ? Math.sin(wobble * 3) * 8 : 0;
-  var offsetX = baseWobble + shakeWobble;
 
-  var values = [needs.hunger, needs.loneliness, needs.cleanliness, needs.energy];
-  var minNeed = Math.min(values[0], values[1], values[2], values[3]);
-  var faceHue = 0.9 - (0.6 * (1 - minNeed / 100));
+  let baseWobble = Math.sin(wobble) * 3;
+  let shakeWobble = shakeAnimation > 0 ? Math.sin(wobble * 3) * 8 : 0;
+  let offsetX = baseWobble + shakeWobble;
 
-  // Color changes based on restlessness
-  if (isRestless) {
-    g.setColor(0.9, 0.7, 0.3); // Yellowish when restless
-  } else {
-    g.setColor(isSad ? 0.8 : faceHue, isSad ? 0.75 : 0.8, isSad ? 0.8 : 1);
-  }
+  let values = Object.keys(needs).map(key => needs[key]);
+  let minNeed = Math.min.apply(null, values);
+  let faceHue = 0.9 - (0.6 * (1 - minNeed / 100));
+
+  if (isRestless) g.setColor(0.9, 0.7, 0.3);
+  else g.setColor(isSad ? 0.8 : faceHue, isSad ? 0.75 : 0.8, isSad ? 0.8 : 1);
   g.fillCircle(centerX + offsetX, centerY, faceRadius);
 
   g.setColor(1, 0.6, 0.7);
-  g.fillPoly([
-    centerX - 30 + offsetX, centerY - 50,
-    centerX - 50 + offsetX, centerY - 80,
-    centerX - 20 + offsetX, centerY - 70
-  ]);
-  g.fillPoly([
-    centerX + 30 + offsetX, centerY - 50,
-    centerX + 50 + offsetX, centerY - 80,
-    centerX + 20 + offsetX, centerY - 70
-  ]);
+  g.fillPoly([centerX - 30 + offsetX, centerY - 50, centerX - 50 + offsetX, centerY - 80, centerX - 20 + offsetX, centerY - 70]);
+  g.fillPoly([centerX + 30 + offsetX, centerY - 50, centerX + 50 + offsetX, centerY - 80, centerX + 20 + offsetX, centerY - 70]);
 
   g.setColor(0, 0, 0);
   if (blinkNow) {
@@ -214,27 +176,9 @@ function drawFace() {
 
   drawNeedBars();
   if (emergency) drawEmergencyIcon();
-  if (isRestless) drawRestlessIcon();
 }
 
-function drawRestlessIcon() {
-  // Draw "movement needed" icon
-  g.setColor(1, 0.8, 0);
-  g.fillPoly([
-    centerX - 20, centerY - 85,
-    centerX - 5, centerY - 95,
-    centerX - 5, centerY - 75
-  ]);
-  g.fillPoly([
-    centerX + 5, centerY - 85,
-    centerX + 20, centerY - 95,
-    centerX + 20, centerY - 75
-  ]);
-  g.setColor(0, 0, 0);
-  g.setFont("6x8", 1);
-  g.drawString("MOVE", centerX - 12, centerY - 88);
-}
-
+// Draws the need bars for hunger, love, cleanliness, and energy
 function drawNeedBars() {
   var labels = { hunger: "Hunger", loneliness: "Love", cleanliness: "Clean", energy: "Energy" };
   var colors = [[1,0,0], [1,0.5,0], [0,0.5,1], [0.5,0,1]];
@@ -246,46 +190,33 @@ function drawNeedBars() {
     var width = Math.max(5, val * barWidth / 100);
     var y = 30 + (i % 2) * spacing;
     var x = i < 2 ? left : right;
-
+    
     g.setColor(0.2, 0.2, 0.2);
     g.fillRect(x, y, x + barWidth, y + barHeight);
-    g.setColor(colors[i][0], colors[i][1], colors[i][2]);
+    
+    g.setColor(colors[i][0], colors[i][1], colors[i][2]); // Kein Spread, direkt RGB
     g.fillRect(x, y, x + width, y + barHeight);
+    
     g.setColor(1, 1, 1);
     g.drawRect(x, y, x + barWidth, y + barHeight);
+    
     g.setFont("6x8", 1);
     g.drawString(labels[keys[i]], x + (barWidth - g.stringWidth(labels[keys[i]])) / 2, y + 3);
   }
 }
 
-function drawEmergencyIcon() {
-  g.setColor(1, 0, 0);
-  g.fillPoly([
-    centerX, centerY - 70,
-    centerX - 15, centerY - 40,
-    centerX + 15, centerY - 40
-  ]);
-  g.setColor(1, 1, 1);
-  g.setFont("6x8", 2);
-  g.drawString("!", centerX - 4, centerY - 62);
-}
-
+// Draws the interaction menu
 function drawMenu() {
-  var yStart = 150;
-  var itemHeight = 18;
-  g.setColor(0, 0, 0);
-  g.fillRect(60, yStart, 180, yStart + 80);
-  g.setColor(1, 1, 1);
-  g.drawRect(60, yStart, 180, yStart + 80);
+  const yStart = 150, itemHeight = 18;
+  g.setColor(0, 0, 0); g.fillRect(60, yStart, 180, yStart + 80);
+  g.setColor(1, 1, 1); g.drawRect(60, yStart, 180, yStart + 80);
   g.setFont("6x8", 1.5);
-  for (var i = 0; i < menuOptions.length; i++) {
-    var text = menuOptions[i];
-    var textX = 120 - g.stringWidth(text) / 2;
-    var yItem = yStart + 5 + i * itemHeight;
+  for (let i = 0; i < menuOptions.length; i++) {
+    let text = menuOptions[i];
+    let textX = 120 - g.stringWidth(text) / 2;
+    let yItem = yStart + 5 + i * itemHeight;
     if (i === selectedOption) {
-      g.setColor(1, 1, 0);
-      g.fillRect(65, yItem - 1, 175, yItem + 15);
-      g.setColor(0, 0, 0);
+      g.setColor(1, 1, 0); g.fillRect(65, yItem - 1, 175, yItem + 15); g.setColor(0, 0, 0);
     } else {
       g.setColor(1, 1, 1);
     }
@@ -293,93 +224,152 @@ function drawMenu() {
   }
 }
 
-// === GAME LOGIC ===
+// Handles the selected menu action
 function handleMenuSelection(action) {
   if (action === "Feed") needs.hunger = Math.min(100, needs.hunger + 30);
   else if (action === "Pet") needs.loneliness = Math.min(100, needs.loneliness + 25);
   else if (action === "Clean") needs.cleanliness = Math.min(100, needs.cleanliness + 40);
   else if (action === "Sleep") needs.energy = Math.min(100, needs.energy + 35);
+
+  var allNeedsOk = true;
+  var keys = Object.keys(needs);
+  for (var i = 0; i < keys.length; i++) {
+    if (needs[keys[i]] <= 30) {
+      allNeedsOk = false;
+      break;
+    }
+  }
+  if (emergency && allNeedsOk) {
+    clearEmergency();
+  }
+
   Bangle.buzz(200);
   Bluetooth.println("STATUS " + JSON.stringify(needs));
 }
 
+// Clears the emergency state
+function clearEmergency() {
+  emergency = false;
+  if (emergencyTimer) {
+    clearTimeout(emergencyTimer);
+    emergencyTimer = null;
+  }
+  if (vibrationInterval) {
+    clearInterval(vibrationInterval);
+    vibrationInterval = null;
+  }
+}
+
+// Updates the needs over time
 function updateNeeds() {
   if (!pigAlive || menuVisible) return;
   needs.hunger = Math.max(0, needs.hunger - 1);
   needs.loneliness = Math.max(0, needs.loneliness - 0.7);
   needs.cleanliness = Math.max(0, needs.cleanliness - 0.5);
   needs.energy = Math.max(0, needs.energy - 0.6);
-  
-  // Update sadness based on needs (not just restlessness)
-  if (!isRestless) {
-    isSad = isSadFromNeeds();
+
+  if (!isRestless) isSad = isSadFromNeeds();
+
+  var hasLowNeed = false;
+  var keys = Object.keys(needs);
+  for (var i = 0; i < keys.length; i++) {
+    if (needs[keys[i]] < 20) {
+      hasLowNeed = true;
+      break;
+    }
   }
-  
-  if (needs.hunger >= 100 && !emergency) startEmergency();
+  if (hasLowNeed && !emergency) {
+    startEmergency();
+  }
 }
 
+// Main tick function for animation and updates
 function tick() {
   if (!pigAlive) return;
   wobble += wobbleDir * 0.2;
   if (Math.abs(wobble) > 2) wobbleDir = -wobbleDir;
-  blinkNow = (Math.random() < 0.05);
-  
-  // Reduce shake animation
+  blinkNow = Math.random() < 0.05;
   if (shakeAnimation > 0) shakeAnimation--;
-  
   updateNeeds();
-  if (menuVisible) drawMenu();
-  else drawFace();
+  if (menuVisible) {
+    drawMenu();
+  } else {
+    drawFace();
+  }
 }
 
+// Starts the emergency state
 function startEmergency() {
   if (emergency) return;
   emergency = true;
-  vibrationInterval = setInterval(() => Bangle.buzz(500), 1000);
+  vibrationInterval = setInterval(() => {
+    if (pigAlive && emergency) Bangle.buzz(500);
+  }, 3000);
   emergencyTimer = setTimeout(() => {
     if (emergency) {
+      clearEmergency();
       Bangle.buzz(1000);
       g.clear();
-      g.setColor(1, 0, 0);
+      g.setColor(1, 0.5, 0);
       g.setFont("6x8", 2);
-      g.drawString("Your pig died :(", 20, 100);
+      g.drawString("Pig is unconscious...", 15, 100);
       g.setFont("6x8", 1);
-      g.drawString("Press BTN1 to revive", 30, 140);
-      clearInterval(mainInterval);
-      clearInterval(vibrationInterval);
+      g.drawString("Press BTN1 to help it recover", 20, 140);
+      if (mainInterval) {
+        clearInterval(mainInterval);
+        mainInterval = null;
+      }
       pigAlive = false;
+      Bluetooth.println("PIG_UNCONSCIOUS");
     }
   }, 20000);
+  Bluetooth.println("EMERGENCY_STARTED");
 }
 
+// Revives the pig after unconsciousness
 function revivePig() {
   needs = { hunger: 50, loneliness: 50, cleanliness: 50, energy: 50 };
   pigAlive = true;
-  emergency = false;
   menuVisible = false;
+  selectedOption = 0;
   isRestless = false;
+  isSad = false;
   lastMovementTime = Date.now();
-  
-  clearInterval(vibrationInterval);
-  clearInterval(restlessVibrationInterval);
-  vibrationInterval = null;
-  restlessVibrationInterval = null;
-  
+
+  clearEmergency();
+
+  if (restlessVibrationInterval) {
+    clearInterval(restlessVibrationInterval);
+    restlessVibrationInterval = null;
+  }
+
   if (!mainInterval) mainInterval = setInterval(tick, 500);
   g.clear();
   drawFace();
-  Bluetooth.println("STATUS " + JSON.stringify(needs));
+  Bluetooth.println("PIG_REVIVED " + JSON.stringify(needs));
 }
 
-// === BUTTON CONTROLS ===
+// Handles cleanup on reset
+function cleanup() {
+  if (mainInterval) clearInterval(mainInterval);
+  if (vibrationInterval) clearInterval(vibrationInterval);
+  if (restlessVibrationInterval) clearInterval(restlessVibrationInterval);
+  if (inactivityCheckInterval) clearInterval(inactivityCheckInterval);
+  if (emergencyTimer) clearTimeout(emergencyTimer);
+  if (shakeAnimationTimer) clearTimeout(shakeAnimationTimer);
+}
+
+// Handles button 1: revive or navigate up in menu
 setWatch(() => {
-  if (!pigAlive) revivePig();
-  else if (menuVisible) {
+  if (!pigAlive) {
+    revivePig();
+  } else if (menuVisible) {
     selectedOption = (selectedOption - 1 + menuOptions.length) % menuOptions.length;
     drawMenu();
   }
 }, BTN1, { repeat: true, edge: "rising" });
 
+// Handles button 2: open menu or select action
 setWatch(() => {
   if (!pigAlive) return;
   if (!menuVisible) {
@@ -393,27 +383,38 @@ setWatch(() => {
   }
 }, BTN2, { repeat: true, edge: "rising" });
 
+// Handles button 3: navigate down in menu
 setWatch(() => {
   if (!pigAlive || !menuVisible) return;
   selectedOption = (selectedOption + 1) % menuOptions.length;
   drawMenu();
 }, BTN3, { repeat: true, edge: "rising" });
 
-// === BLUETOOTH INPUT HANDLER ===
+// Handles Bluetooth input commands
+Bluetooth.setConsole(1);
 Bluetooth.on('data', function(data) {
   data = data.trim().toLowerCase();
-  if (data === "feed") handleMenuSelection("Feed");
-  else if (data === "pet") handleMenuSelection("Pet");
-  else if (data === "clean") handleMenuSelection("Clean");
-  else if (data === "sleep") handleMenuSelection("Sleep");
-  else if (data === "status") Bluetooth.println("STATUS " + JSON.stringify(needs));
+  switch (data) {
+    case "feed": handleMenuSelection("Feed"); break;
+    case "pet": handleMenuSelection("Pet"); break;
+    case "clean": handleMenuSelection("Clean"); break;
+    case "sleep": handleMenuSelection("Sleep"); break;
+    case "status": Bluetooth.println("STATUS " + JSON.stringify(needs)); break;
+    case "revive": if (!pigAlive) revivePig(); break;
+  }
 });
 
-// === INIT ===
-startAccelerometer();
+// Initializes game loop and sensors
 mainInterval = setInterval(tick, 500);
 drawFace();
+startAccelerometer();
 
-// Uncomment these after uploading to disable REPL input:
-// NRF.setServices({}, { uart: true });
-// E.setConsole(null);
+// Periodically sends status over Bluetooth
+setInterval(() => {
+  if (NRF.getSecurityStatus().connected && pigAlive) {
+    Bluetooth.println("STATUS " + JSON.stringify(needs));
+  }
+}, 10000);
+
+// Registers cleanup function on reset
+E.on('kill', cleanup);
