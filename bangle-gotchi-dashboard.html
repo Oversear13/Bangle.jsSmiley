@@ -46,6 +46,29 @@
       max-height: 200px;
       overflow-y: auto;
     }
+
+    .last-updated {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .timestamp {
+      font-family: monospace;
+      font-weight: bold;
+      color: #495057;
+    }
+
+    .timestamp.stale {
+      color: #dc3545;
+    }
+
+    .timestamp.fresh {
+      color: #28a745;
+    }
   </style>
 </head>
 
@@ -57,7 +80,12 @@
 
   <div class="bg-white rounded-lg shadow p-6">
     <div class="text-center text-6xl mb-4" id="petFace">🐷</div>
-    
+
+    <div class="last-updated" id="lastUpdatedContainer" style="display: none;">
+      <div class="text-sm text-gray-600 mb-1">Pet Status Last Updated</div>
+      <div id="lastUpdated" class="timestamp">Never</div>
+    </div>
+
     <div class="grid grid-cols-2 gap-4 mb-6">
       <div class="status-container">
         <label class="text-sm font-semibold">Hunger</label>
@@ -115,6 +143,7 @@
     let pigAlive = true;
     let isEmergency = false;
     let isRestless = false;
+    let lastStatusUpdate = null;
 
     function log(message) {
       console.log(message);
@@ -126,6 +155,38 @@
 
     function clearDebug() {
       document.getElementById('debugLog').innerHTML = '';
+    }
+
+    function updateLastUpdatedDisplay() {
+      const lastUpdatedEl = document.getElementById('lastUpdated');
+      const containerEl = document.getElementById('lastUpdatedContainer');
+
+      if (lastStatusUpdate) {
+        containerEl.style.display = 'block';
+
+        const now = new Date();
+        const diff = now - lastStatusUpdate;
+        const secondsAgo = Math.floor(diff / 1000);
+
+        let timeText;
+        if (secondsAgo < 60) {
+          timeText = `${secondsAgo} seconds ago`;
+        } else if (secondsAgo < 3600) {
+          timeText = `${Math.floor(secondsAgo / 60)} minutes ago`;
+        } else {
+          timeText = `${Math.floor(secondsAgo / 3600)} hours ago`;
+        }
+
+        lastUpdatedEl.textContent = timeText;
+        lastUpdatedEl.className = 'timestamp';
+        if (secondsAgo < 30) {
+          lastUpdatedEl.classList.add('fresh');
+        } else if (secondsAgo > 60) {
+          lastUpdatedEl.classList.add('stale');
+        }
+      } else {
+        containerEl.style.display = 'none';
+      }
     }
 
     function connectToBangle() {
@@ -180,6 +241,7 @@
                   try {
                     const json = JSON.parse(line.slice(7));
                     log(`Status updated: ${JSON.stringify(json)}`);
+                    lastStatusUpdate = new Date();
                     updateStatus(json);
                   } catch (e) {
                     log(`JSON parse error: ${e.message}`);
@@ -221,6 +283,7 @@
         intervalRef = setInterval(() => {
           log("Requesting status...");
           sendCommand("status");
+          updateLastUpdatedDisplay();
         }, 10000);
 
         log("Connection established successfully!");
@@ -252,9 +315,11 @@
       }
       characteristic = null;
       device = null;
+      lastStatusUpdate = null;
 
       document.getElementById("connectionStatus").textContent = "Disconnected";
       document.getElementById("connectionStatus").classList.replace("bg-green-500", "bg-red-500");
+      document.getElementById("lastUpdatedContainer").style.display = "none";
 
       log("Disconnected from device");
     }
@@ -299,28 +364,29 @@
       updateBar("energyBar", "energyValue", needs.energy);
 
       const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
+
       
-      // Check for emergency conditions
       if (minNeed < 20) {
         isEmergency = true;
       } else if (minNeed >= 30) {
         isEmergency = false;
       }
-      
+
       updatePetFace(needs);
       updateStatusText();
       updateCareTips(needs);
+      updateLastUpdatedDisplay();
     }
 
     function updatePetFace(needs) {
       const petFace = document.getElementById("petFace");
       const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
-      
+
       if (!pigAlive) {
         petFace.textContent = "💀";
         return;
       }
-      
+
       if (isEmergency) {
         petFace.textContent = "😱";
       } else if (isRestless) {
@@ -335,15 +401,15 @@
     }
 
     function updateStatusText() {
-      // Status text removed - no longer displayed
+
     }
 
     function updateCareTips(needs) {
       const tipText = document.getElementById("careTips");
       const minNeed = Math.min(needs.hunger, needs.loneliness, needs.cleanliness, needs.energy);
-      
+
       let tip = "Your pet is happy and healthy!";
-      
+
       if (isEmergency) {
         tip = "🚨 CRITICAL! Your pet will die soon without care!";
       } else if (minNeed < 30) {
@@ -354,9 +420,9 @@
       }
 
       tipText.textContent = tip;
-      tipText.className = isEmergency ? 
+      tipText.className = isEmergency ?
         "bg-red-100 text-red-800 p-4 rounded font-bold animate-pulse" :
-        minNeed < 30 ? 
+        minNeed < 30 ?
           "bg-orange-100 text-orange-800 p-4 rounded" :
           "bg-green-100 text-green-800 p-4 rounded";
     }
@@ -375,6 +441,13 @@
       document.getElementById(barId).style.width = `${clamped}%`;
       document.getElementById(valId).textContent = Math.round(clamped);
     }
+
+    // Update the display every second when connected
+    setInterval(() => {
+      if (lastStatusUpdate) {
+        updateLastUpdatedDisplay();
+      }
+    }, 1000);
 
     log("Dashboard initialized. Click 'Connect to Bangle.js' to start.");
   </script>
